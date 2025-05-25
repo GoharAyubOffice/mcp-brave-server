@@ -1,52 +1,73 @@
-#!/usr/bin/env node
-
-const http = require('http');
+const express = require('express');
 const { spawn } = require('child_process');
+const bodyParser = require('body-parser');
 
-const PORT = process.env.PORT || 3000;
+const app = express();
+const PORT = process.env.PORT || 10000;
 
-console.log(`Starting server on port ${PORT}`);
+// Check for required environment variables
+if (!process.env.BRAVE_API_KEY) {
+  console.error('Error: BRAVE_API_KEY environment variable is required');
+  process.exit(1);
+}
 
-// Start the MCP server as a child process
-const mcpServer = spawn('node', ['./node_modules/@modelcontextprotocol/server-brave-search/dist/index.js']);
+// Middleware
+app.use(bodyParser.json());
 
-// Create HTTP server
-const server = http.createServer((req, res) => {
-  console.log(`Received request: ${req.method} ${req.url}`);
-  
-  if (req.url === '/health') {
-    res.writeHead(200);
-    res.end('OK');
-    return;
+// Start MCP server with environment variables
+const mcpServer = spawn('node', ['./node_modules/@modelcontextprotocol/server-brave-search/dist/index.js'], {
+  env: {
+    ...process.env,
+    BRAVE_API_KEY: process.env.BRAVE_API_KEY
   }
-
-  // Forward other requests to MCP server
-  mcpServer.stdin.write(JSON.stringify({
-    type: 'request',
-    data: {
-      method: req.method,
-      url: req.url,
-      headers: req.headers,
-      body: req.body
-    }
-  }) + '\n');
 });
 
-// Handle MCP server output
-mcpServer.stdout.on('data', (data) => {
-  console.log(`MCP Server: ${data}`);
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
 });
 
+// Main endpoint
+app.post('/search', async (req, res) => {
+  try {
+    const requestData = {
+      type: 'request',
+      data: {
+        ...req.body,
+        apiKey: process.env.BRAVE_API_KEY
+      }
+    };
+
+    mcpServer.stdin.write(JSON.stringify(requestData) + '\n');
+
+    // Handle response from MCP server
+    const responseHandler = (data) => {
+      try {
+        const response = JSON.parse(data.toString());
+        res.json(response);
+        mcpServer.stdout.removeListener('data', responseHandler);
+      } catch (error) {
+        console.error('Error parsing MCP response:', error);
+      }
+    };
+
+    mcpServer.stdout.on('data', responseHandler);
+  } catch (error) {
+    console.error('Error processing request:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Error handling
 mcpServer.stderr.on('data', (data) => {
-  console.error(`MCP Server Error: ${data}`);
+  console.error('MCP Server Error:', data.toString());
 });
 
-// Handle server errors
-server.on('error', (error) => {
-  console.error('Server error:', error);
+mcpServer.on('error', (error) => {
+  console.error('MCP Server Process Error:', error);
 });
 
-// Start the server
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`HTTP Server running on port ${PORT}`);
+// Start server
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
 }); 
