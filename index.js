@@ -22,6 +22,18 @@ const mcpServer = spawn('node', ['./node_modules/@modelcontextprotocol/server-br
   }
 });
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      search: '/search (POST)'
+    },
+    usage: 'Send POST requests to /search with your search query'
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
@@ -65,6 +77,15 @@ mcpServer.stderr.on('data', (data) => {
 
 mcpServer.on('error', (error) => {
   console.error('MCP Server Process Error:', error);
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: 'The requested endpoint does not exist',
+    availableEndpoints: ['/', '/health', '/search']
+  });
 });
 
 // Start server
