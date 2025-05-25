@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "npx -y @modelcontextprotocol/server-brave-search"
+    "start": "node index.js"
   },
   "dependencies": {
     "@modelcontextprotocol/server-brave-search": "^0.6.2"
