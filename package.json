@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "mcp-server-brave-search"
+    "start": "node ./node_modules/@modelcontextprotocol/server-brave-search/dist/index.js"
   },
   "dependencies": {
     "@modelcontextprotocol/server-brave-search": "^0.6.2"
